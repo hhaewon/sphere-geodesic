@@ -13,7 +13,7 @@ class SphericalPoint:
         self.longitude = np.radians(longitude)
         self.phi: float = np.radians(90 - latitude)
         self.theta: float = (
-            np.radians(longitude) if latitude >= 0 else np.radians(180 - longitude)
+            np.radians(longitude) if longitude >= 0 else np.radians(180 - longitude)
         )
 
 
@@ -26,7 +26,7 @@ def convert_spherical_to_cartesian(point: SphericalPoint) -> Point3D:
     return (x, y, z)
 
 
-def geodesic_path(
+def get_geodesic(
     t: float,
     v1: NDArray[np.float64],
     v2: NDArray[np.float64],
@@ -38,32 +38,41 @@ def geodesic_path(
     return tuple(v)
 
 
-def get_parametric_geodesic_function(
-    v1: NDArray[np.float64],
-    v2: NDArray[np.float64],
-) -> ParametricFunction:
-    c = np.arccos(v1 @ v2)
-    geodesic = ParametricFunction(
-        partial(geodesic_path, v1=v1, v2=v2),
-        t_range=np.array([0, c]),
-        color=ORANGE,
-    )
-    return geodesic
-
-
-def convert_sphere_to_Mercator(point: SphericalPoint, R: float) -> tuple[float, float]:
+def convert_spherical_to_Mercator(point: SphericalPoint, R: float) -> Point3D:
     latitude, longitude = point.latitude, point.longitude
     x = R * longitude
     y = R * np.log(np.tan(np.pi / 4 + latitude / 2))
 
-    return (x, y)
+    return (x, y, 0)
 
 
-def convert_Mercator_to_sphere(point: tuple[float, float], R: float) -> SphericalPoint:
+def convert_Mercator_to_spherical(
+    point: tuple[float, float], R: float
+) -> SphericalPoint:
     x, y = point
     latitude = x / R
     longitude = 2 * np.arctan(np.exp(y / R)) - np.pi / 2
     return SphericalPoint(latitude=latitude, longitude=longitude)
+
+
+def get_line_on_world_map(t: float, v1: NDArray[np.float64], v2: NDArray[np.float64]):
+    v = (v2 - v1) * t + v1
+    return tuple(v)
+
+
+def get_geodesic_on_world_map(
+    t: float,
+    v1: NDArray[np.float64],
+    v2: NDArray[np.float64],
+    R: float,
+):
+    x, y, z = get_geodesic(t=t, v1=v1, v2=v2)
+    theta = np.arctan(y / x)
+    phi = np.arccos(z)
+    latitude = np.pi / 2 - phi
+    longitude = theta if 0 <= theta <= np.pi else np.pi - theta
+    point = SphericalPoint(latitude=latitude, longitude=longitude)
+    return convert_spherical_to_Mercator(point=point, R=R)
 
 
 class SphereWithGeodesicScene(ThreeDScene):
@@ -81,16 +90,21 @@ class SphereWithGeodesicScene(ThreeDScene):
         point1 = SphericalPoint(45, 90)
         point2 = SphericalPoint(-30, 60)
 
-        mercator_point1 = convert_sphere_to_Mercator(point=point1, R=R)
-        mercator_point2 = convert_sphere_to_Mercator(point=point2, R=R)
-
-        origin = (0, 0)
-        dot_mercator1 = Dot3D(point=list(mercator_point1) + [0], color=RED, z_index=1)
-        dot_mercator2 = Dot3D(point=list(mercator_point2) + [0], color=GREEN, z_index=1)
-        dot_origin = Dot3D(point=list(origin) + [0], color=BLACK, z_index=1)
+        mercator_point1 = convert_spherical_to_Mercator(point=point1, R=R)
+        mercator_point2 = convert_spherical_to_Mercator(point=point2, R=R)
+        v1: NDArray[np.float64] = np.array(mercator_point1)
+        v2: NDArray[np.float64] = np.array(mercator_point2)
+        dot_mercator1 = Dot3D(point=list(mercator_point1), color=RED, z_index=1)
+        dot_mercator2 = Dot3D(point=list(mercator_point2), color=GREEN, z_index=1)
+        line_on_world_map = ParametricFunction(
+            partial(get_line_on_world_map, v1=v1, v2=v2),
+            t_range=np.array([0, 1]),
+            color=PINK,
+        )
 
         # Set up the 3D axess
         axes = ThreeDAxes()
+
         # Create a sphere
         sphere = Sphere(radius=1, color=BLUE, resolution=(50, 50))
 
@@ -105,12 +119,22 @@ class SphereWithGeodesicScene(ThreeDScene):
         dot2 = Dot3D(point=list(cartesian_point2), color=GREEN)
 
         # Create the geodesic (great circle) line between the two points
-        geodesic = get_parametric_geodesic_function(v1=v1, v2=v2)
+        c = np.arccos(v1 @ v2)
+        geodesic = ParametricFunction(
+            partial(get_geodesic, v1=v1, v2=v2), t_range=np.array([0, c]), color=ORANGE
+        )
+        geodesic_on_world_map = ParametricFunction(
+            partial(get_geodesic_on_world_map, v1=v1, v2=v2, R=R),
+            t_range=np.array([0, c]),
+            color=ORANGE,
+        )
 
         # animation
         self.add(global_map)
         self.play(FadeIn(global_map, run_time=1))
-        vgroup1 = VGroup(dot_mercator1, dot_mercator2, dot_origin)
+        vgroup1 = VGroup(
+            dot_mercator1, dot_mercator2, line_on_world_map, geodesic_on_world_map
+        )
         self.add(vgroup1)
         self.play(Create(vgroup1))
         self.wait(duration=2)
