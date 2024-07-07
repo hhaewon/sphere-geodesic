@@ -95,9 +95,7 @@ def get_line_on_sphere(
     R: float,
 ):
     mercator_point = get_line_on_world_map(t=t, v1=v1, v2=v2)[:2]
-    print(mercator_point)
     spherical_point = convert_Mercator_to_spherical(point=mercator_point, R=R)
-    print(spherical_point)
     cartesian_point = convert_spherical_to_cartesian(point=spherical_point)
     print(cartesian_point)
     return cartesian_point
@@ -116,7 +114,7 @@ class SphereWithGeodesicScene(ThreeDScene):
 
         # Latitude and Longitude for the two points
         point1 = SphericalPoint(45, 90)
-        point2 = SphericalPoint(-30, 60)
+        point2 = SphericalPoint(45, 0)
 
         mercator_point1 = convert_spherical_to_Mercator(point=point1, R=R)
         mercator_point2 = convert_spherical_to_Mercator(point=point2, R=R)
@@ -140,7 +138,7 @@ class SphereWithGeodesicScene(ThreeDScene):
         axes = ThreeDAxes()
 
         # Create a sphere
-        sphere = Sphere(radius=1, color=BLUE, resolution=(50, 50), z_index=0)
+        sphere = Sphere(radius=1, color=BLUE, resolution=(50, 50))
 
         cartesian_point1 = convert_spherical_to_cartesian(point1)
         print(cartesian_point1)
@@ -150,8 +148,8 @@ class SphereWithGeodesicScene(ThreeDScene):
         v2: NDArray[np.float64] = np.array(cartesian_point2)
 
         # Create dots at the given latitude and longitude
-        dot1 = Dot3D(point=list(cartesian_point1), color=RED, z_index=1)
-        dot2 = Dot3D(point=list(cartesian_point2), color=GREEN, z_index=1)
+        dot1 = Dot3D(point=list(cartesian_point1), color=RED)
+        dot2 = Dot3D(point=list(cartesian_point2), color=GREEN)
 
         # Create the geodesic (great circle) line between the two points
         c = np.arccos(v1 @ v2)
@@ -159,7 +157,6 @@ class SphereWithGeodesicScene(ThreeDScene):
             partial(get_geodesic_on_sphere, v1=v1, v2=v2),
             t_range=np.array([0, c]),
             color=ORANGE,
-            z_index=1,
         )
         geodesic_on_world_map = ParametricFunction(
             partial(get_geodesic_on_world_map, v1=v1, v2=v2, R=R),
