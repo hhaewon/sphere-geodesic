@@ -8,13 +8,19 @@ from manim.typing import Point3D
 
 
 class SphericalPoint:
+    """
+    latitude, longitude: degrees
+    self.latitude, self.longitude, self.phi, self.theta: radians
+    """
+
     def __init__(self, latitude: float, longitude: float):
-        self.latitude = np.radians(latitude)
-        self.longitude = np.radians(longitude)
-        self.phi: float = np.radians(90 - latitude)
-        self.theta: float = (
-            np.radians(longitude) if longitude >= 0 else np.radians(180 - longitude)
-        )
+        self.latitude: float = np.radians(latitude)
+        self.longitude: float = np.radians(longitude)
+        self.phi: float = np.pi / 2 - self.latitude
+        self.theta: float = self.longitude if longitude >= 0 else np.pi - self.longitude
+
+    def __repr__(self) -> str:
+        return f"{self.latitude=} {self.longitude=} {self.phi=} {self.theta=}"
 
 
 # Convert spherical coordinates to Cartesian coordinates
@@ -26,7 +32,7 @@ def convert_spherical_to_cartesian(point: SphericalPoint) -> Point3D:
     return (x, y, z)
 
 
-def get_geodesic(
+def get_geodesic_on_sphere(
     t: float,
     v1: NDArray[np.float64],
     v2: NDArray[np.float64],
@@ -50,12 +56,16 @@ def convert_Mercator_to_spherical(
     point: tuple[float, float], R: float
 ) -> SphericalPoint:
     x, y = point
-    latitude = x / R
-    longitude = 2 * np.arctan(np.exp(y / R)) - np.pi / 2
-    return SphericalPoint(latitude=latitude, longitude=longitude)
+    longitude = x / R
+    latitude = 2 * np.arctan(np.exp(y / R)) - np.pi / 2
+    return SphericalPoint(
+        latitude=np.degrees(latitude), longitude=np.degrees(longitude)
+    )
 
 
-def get_line_on_world_map(t: float, v1: NDArray[np.float64], v2: NDArray[np.float64]):
+def get_line_on_world_map(
+    t: float, v1: NDArray[np.float64], v2: NDArray[np.float64]
+) -> tuple[float, float, float]:
     v = (v2 - v1) * t + v1
     return tuple(v)
 
@@ -66,13 +76,31 @@ def get_geodesic_on_world_map(
     v2: NDArray[np.float64],
     R: float,
 ):
-    x, y, z = get_geodesic(t=t, v1=v1, v2=v2)
-    theta = np.arctan(y / x)
+    x, y, z = get_geodesic_on_sphere(t=t, v1=v1, v2=v2)
+    theta = np.arctan2(y, x)
     phi = np.arccos(z)
     latitude = np.pi / 2 - phi
     longitude = theta if 0 <= theta <= np.pi else np.pi - theta
-    point = SphericalPoint(latitude=latitude, longitude=longitude)
-    return convert_spherical_to_Mercator(point=point, R=R)
+    spherical_point = SphericalPoint(
+        latitude=np.degrees(latitude), longitude=np.degrees(longitude)
+    )
+    mercator_point = convert_spherical_to_Mercator(point=spherical_point, R=R)
+    return mercator_point
+
+
+def get_line_on_sphere(
+    t: float,
+    v1: NDArray[np.float64],
+    v2: NDArray[np.float64],
+    R: float,
+):
+    mercator_point = get_line_on_world_map(t=t, v1=v1, v2=v2)[:2]
+    print(mercator_point)
+    spherical_point = convert_Mercator_to_spherical(point=mercator_point, R=R)
+    print(spherical_point)
+    cartesian_point = convert_spherical_to_cartesian(point=spherical_point)
+    print(cartesian_point)
+    return cartesian_point
 
 
 class SphereWithGeodesicScene(ThreeDScene):
@@ -101,27 +129,37 @@ class SphereWithGeodesicScene(ThreeDScene):
             t_range=np.array([0, 1]),
             color=PINK,
         )
+        line_on_sphere = ParametricFunction(
+            partial(get_line_on_sphere, v1=v1, v2=v2, R=R),
+            t_range=np.array([0, 1]),
+            color=PINK,
+            z_index=1,
+        )
 
         # Set up the 3D axess
         axes = ThreeDAxes()
 
         # Create a sphere
-        sphere = Sphere(radius=1, color=BLUE, resolution=(50, 50))
+        sphere = Sphere(radius=1, color=BLUE, resolution=(50, 50), z_index=0)
 
         cartesian_point1 = convert_spherical_to_cartesian(point1)
+        print(cartesian_point1)
         cartesian_point2 = convert_spherical_to_cartesian(point2)
-
+        print(cartesian_point2)
         v1: NDArray[np.float64] = np.array(cartesian_point1)
         v2: NDArray[np.float64] = np.array(cartesian_point2)
 
         # Create dots at the given latitude and longitude
-        dot1 = Dot3D(point=list(cartesian_point1), color=RED)
-        dot2 = Dot3D(point=list(cartesian_point2), color=GREEN)
+        dot1 = Dot3D(point=list(cartesian_point1), color=RED, z_index=1)
+        dot2 = Dot3D(point=list(cartesian_point2), color=GREEN, z_index=1)
 
         # Create the geodesic (great circle) line between the two points
         c = np.arccos(v1 @ v2)
         geodesic = ParametricFunction(
-            partial(get_geodesic, v1=v1, v2=v2), t_range=np.array([0, c]), color=ORANGE
+            partial(get_geodesic_on_sphere, v1=v1, v2=v2),
+            t_range=np.array([0, c]),
+            color=ORANGE,
+            z_index=1,
         )
         geodesic_on_world_map = ParametricFunction(
             partial(get_geodesic_on_world_map, v1=v1, v2=v2, R=R),
@@ -143,7 +181,7 @@ class SphereWithGeodesicScene(ThreeDScene):
         axes.add(axes.get_axis_labels())
 
         ## Add the sphere, dots, and geodesic to the scene
-        vgroup2 = VGroup(axes, sphere, dot1, dot2, geodesic)
+        vgroup2 = VGroup(axes, sphere, dot1, dot2, line_on_sphere, geodesic)
         self.add(vgroup2)
 
         # Rotate the camera to give a better view of the sphere
