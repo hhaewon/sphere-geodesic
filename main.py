@@ -1,6 +1,7 @@
 # ruff: noqa: F403, F405
 
 from functools import partial
+from typing import Callable
 from manim import *  # type: ignore
 import numpy as np
 from numpy.typing import NDArray
@@ -97,8 +98,25 @@ def get_line_on_sphere(
     mercator_point = get_line_on_world_map(t=t, v1=v1, v2=v2)[:2]
     spherical_point = convert_Mercator_to_spherical(point=mercator_point, R=R)
     cartesian_point = convert_spherical_to_cartesian(point=spherical_point)
-    print(cartesian_point)
     return cartesian_point
+
+
+def get_length_of_geodesic(point1: SphericalPoint, point2: SphericalPoint) -> float:
+    A: float = np.abs(point1.theta - point2.theta)
+    alpha: float = np.arccos(
+        np.cos(point2.phi) * np.cos(point1.phi)
+        + np.sin(point2.phi) * np.sin(point1.phi) * np.cos(A)
+    )
+    length = 6371 * alpha
+    return length
+
+
+def get_length_of_function(func: Callable[[float], Point3D], t0: float, t1: float):
+    t_values = np.linspace(t0, t1, 10000)
+    points = np.array([func(t) for t in t_values])
+    segments_lengths = np.linalg.norm(np.diff(points, axis=0), axis=1)
+    total_length = np.sum(segments_lengths)
+    return total_length
 
 
 class SphereWithGeodesicScene(ThreeDScene):
@@ -131,8 +149,13 @@ class SphereWithGeodesicScene(ThreeDScene):
             partial(get_line_on_sphere, v1=v1, v2=v2, R=R),
             t_range=np.array([0, 1]),
             color=PINK,
-            z_index=1,
         )
+        line_length = 6371 * get_length_of_function(
+            partial(get_line_on_sphere, v1=v1, v2=v2, R=R), 0, 1
+        )
+        line_length_text = Text(
+            f"Pink Curve Length: {line_length:.2f}km", font_size=24
+        ).to_edge(UL)
 
         # Set up the 3D axess
         axes = ThreeDAxes()
@@ -141,9 +164,7 @@ class SphereWithGeodesicScene(ThreeDScene):
         sphere = Sphere(radius=1, color=BLUE, resolution=(50, 50))
 
         cartesian_point1 = convert_spherical_to_cartesian(point1)
-        print(cartesian_point1)
         cartesian_point2 = convert_spherical_to_cartesian(point2)
-        print(cartesian_point2)
         v1: NDArray[np.float64] = np.array(cartesian_point1)
         v2: NDArray[np.float64] = np.array(cartesian_point2)
 
@@ -152,7 +173,7 @@ class SphereWithGeodesicScene(ThreeDScene):
         dot2 = Dot3D(point=list(cartesian_point2), color=GREEN)
 
         # Create the geodesic (great circle) line between the two points
-        c = np.arccos(v1 @ v2)
+        c: float = np.arccos(np.dot(v1, v2))
         geodesic = ParametricFunction(
             partial(get_geodesic_on_sphere, v1=v1, v2=v2),
             t_range=np.array([0, c]),
@@ -163,6 +184,12 @@ class SphereWithGeodesicScene(ThreeDScene):
             t_range=np.array([0, c]),
             color=ORANGE,
         )
+        geodesic_length = get_length_of_geodesic(point1, point2)
+        geodesic_length_text = Text(
+            f"Orange Curve (Geodesic) Length: {geodesic_length:.2f}km",
+            font_size=24,
+            fill_opacity=0,
+        ).to_edge(UR)
 
         # animation
         self.add(global_map)
@@ -184,8 +211,10 @@ class SphereWithGeodesicScene(ThreeDScene):
         # Rotate the camera to give a better view of the sphere
         self.set_camera_orientation(phi=75 * DEGREES, theta=30 * DEGREES)
         self.play(FadeIn(vgroup2))
+        self.add_fixed_in_frame_mobjects(line_length_text)
+        self.add_fixed_in_frame_mobjects(geodesic_length_text)
+        self.play(Write(line_length_text))
+        self.wait(1)
+        geodesic_length_text.set_opacity(1)
+        self.play(Write(geodesic_length_text))
         self.wait()
-        # self.set_camera_orientation(
-        #     phi=(point1.phi + point2.phi) / 2,
-        #     theta=(point1.theta + point2.theta) / 2,
-        # )
