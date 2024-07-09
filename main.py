@@ -27,9 +27,9 @@ class SphericalPoint:
 # Convert spherical coordinates to Cartesian coordinates
 def convert_spherical_to_cartesian(point: SphericalPoint) -> Point3D:
     phi, theta = point.phi, point.theta
-    x: int = np.cos(theta) * np.sin(phi)
-    y: int = np.sin(theta) * np.sin(phi)
-    z: int = np.cos(phi)
+    x: float = np.cos(theta) * np.sin(phi)
+    y: float = np.sin(theta) * np.sin(phi)
+    z: float = np.cos(phi)
     return (x, y, z)
 
 
