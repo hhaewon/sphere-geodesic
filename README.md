@@ -60,16 +60,18 @@
 ## Getting Started
 ### Prerequisites
 
-* manim
-```sh
-pip install manim
-pip install numpy
-```
+* [manim](https://docs.manim.community/en/stable/installation.html)
 
 ### Usage
+change latitude and longitude in main.py
+```python
+### main.py
+point1 = SphericalPoint(45, 90)
+point2 = SphericalPoint(45, 0)
+```
 ```sh
+### shell
 manim -pqh main.py SphereWithGeodesicScene 
 ```
-
 
 [Manim-url]: https://www.manim.community/
