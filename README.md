@@ -74,4 +74,7 @@ point2 = SphericalPoint(45, 0)
 manim -pqh main.py SphereWithGeodesicScene 
 ```
 
+### Execute in Colab
+You can execute this in [this link](https://colab.research.google.com/drive/1bUQT0Bv52dVvW04c3DOCbvDKTM4Jjd3h?usp=sharing)
+
 [Manim-url]: https://www.manim.community/
