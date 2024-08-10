@@ -76,6 +76,7 @@ manim -pqh main.py SphereWithGeodesicScene
 
 ### Execute in Colab
 You can execute this in [this link](https://colab.research.google.com/drive/1bUQT0Bv52dVvW04c3DOCbvDKTM4Jjd3h?usp=sharing)  
-Before you run all cells, you must upload [world_map.jpg](https://github.com/hhaewon/sphere-geodesic/blob/main/world_map.jpg) on colab
+Before you run all cells, you must upload [world_map.jpg](https://github.com/hhaewon/sphere-geodesic/blob/main/world_map.jpg) on colab  
+If you want to know how to use manim in colab, go to [this link](https://docs.manim.community/en/stable/installation/jupyter.html#google-colaboratory)
 
 [Manim-url]: https://www.manim.community/
